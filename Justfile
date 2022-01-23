@@ -44,8 +44,8 @@ build:
     compile {{main_file}}
 
 # run a specific test
-test TEST: build
-    ./test --test {{TEST}}
+# test TEST: build
+#     ./test --test {{TEST}}
 
 # download and compile pcre 8.45
 pcre_get:
