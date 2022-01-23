@@ -52,16 +52,15 @@ Simple IPv4 parser written in Nim with gzip files handling and build compatibili
 parseip -c FILE
 parseip -l=10 FILE.gz
 cat FILE |parseip
-parseip --parse "***REMOVED***|***REMOVED***" FILE
-parseip -p"sasl" -e"127.0.0.1|***REMOVED***|***REMOVED***" FILE
+parseip --parse "123.123.123.1|123.123.123.1" FILE
+parseip -p"sasl" -e"127.0.0.1|123.123.123|123.123.120" FILE
 parseip -p="127.0.0.[0-9]+" FILE
 parseip -s20M /var/log/messages
 ```
 
 ### Build
 
-Use `just` as modern alternative to `make`: https://github.com/casey/just
-Or manually call commands in `Justfile`
+Use `just` as modern alternative to `make`: https://github.com/casey/just or manually run commands in `Justfile`
 
 ```
 just pcre
