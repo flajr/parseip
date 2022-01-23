@@ -1,7 +1,9 @@
 # parseip
+
 Simple IPv4 parser written in Nim with gzip files handling and build compatibility for musl
 
-## Help from code
+## Help `parseip -h`
+
 ```
     parseip [OPTIONS] [FILE[ FILE]]
 
@@ -44,7 +46,9 @@ Simple IPv4 parser written in Nim with gzip files handling and build compatibili
       -v|--verbose            Show what is going on
 ```
 
-### EXAMPLES:
+### Examples
+
+```
 parseip -c FILE
 parseip -l=10 FILE.gz
 cat FILE |parseip
@@ -52,3 +56,15 @@ parseip --parse "***REMOVED***|***REMOVED***" FILE
 parseip -p"sasl" -e"127.0.0.1|***REMOVED***|***REMOVED***" FILE
 parseip -p="127.0.0.[0-9]+" FILE
 parseip -s20M /var/log/messages
+```
+
+### Build
+
+Use `just` as modern alternative to `make`: https://github.com/casey/just
+Or manually call commands in `Justfile`
+
+```
+just pcre
+just zlib
+just build
+```
