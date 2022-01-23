@@ -52,8 +52,8 @@ Simple IPv4 parser written in Nim with gzip files handling and build compatibili
 parseip -c FILE
 parseip -l=10 FILE.gz
 cat FILE |parseip
-parseip --parse "123.123.123.1|123.123.123.1" FILE
-parseip -p"sasl" -e"127.0.0.1|123.123.123|123.123.120" FILE
+parseip --parse "123.123.123.1|123.123.123.2" FILE
+parseip -p"sasl" -e"127.0.0.1|123.123.123|123.123.124" FILE
 parseip -p="127.0.0.[0-9]+" FILE
 parseip -s20M /var/log/messages
 ```

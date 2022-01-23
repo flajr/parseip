@@ -55,14 +55,14 @@ let help = """
       parseip -c FILE
       parseip -l=10 FILE.gz
       cat FILE |parseip
-      parseip --parse "***REMOVED***|***REMOVED***" FILE
-      parseip -p"sasl" -e"127.0.0.1|***REMOVED***|***REMOVED***" FILE
+      parseip --parse "123.123.123.1|123.123.123.2" FILE
+      parseip -p"sasl" -e"127.0.0.1|123.123.123|123.123.124" FILE
       parseip -p="127.0.0.[0-9]+" FILE
       parseip -s20M /var/log/messages
     """.dedent()
 
 var
-  version     = "1.6.0"
+  version     = "1.6.1"
   stdinBool   = true
   counter     = 0
   ipLimit     = 25
