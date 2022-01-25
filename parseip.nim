@@ -1,89 +1,85 @@
 import os
-import std/[parseopt, parseutils, re, tables, strutils]
+import std/[parseutils, re, tables, strutils]
 import zip/gzipfiles
+import docopt
 
 proc perr(s: string, i: int) =
-  echo "ERROR: " & s
+  writeLine(stderr, "ERROR: " & s)
+  flushFile(stderr)
   quit i
 
 proc pinf(s: string, verbose: bool) =
   if verbose:
-    echo "INFO: " & s
+    writeLine(stderr, "INFO: " & s)
+    flushFile(stderr)
 
-let help = """
-    parseip [OPTIONS] [FILE[ FILE]]
+proc pwrn(s: string, verbose: bool) =
+  if verbose:
+    writeLine(stderr, "WARNING: " & s)
+    flushFile(stderr)
+
+let doc = """
+    Parse IPv4 address occurances
 
     + support for reading *.gz files
     + PATTERN support regex syntax
     + Regex for IPv4 is fast and simple: \b[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\b
       WARNING: This Regex can obviously parse some non IPv4 addresses
-    + Reading STDIN if no file is present
+    + Reading STDIN if "-" (dash) specified
 
-    SYNTAX for OPTIONS:
-      -o:ARG        # OK
-      -o=ARG        # OK
-      -oARG         # OK
-      -o ARG        # ERROR
-      --option:ARG  # OK
-      --option=ARG  # OK
-      --optionARG   # ERROR
-      --option ARG  # OK
+    USAGE:
+      parseip [options] [--] [<FILE>]...
+      parseip [options] [-]
 
     OPTIONS:
-      -c|--clean              Cleaner output, do not print address counts
-                              + Output is sorted
-                              + Honor --limit settings
-      -e|--exclude=PATTERN    Exclude IP if line contains PATTERN 
-                              + usable with -p, exclude has priority
-      -h|--help               Show this help
-      -i|--ignorecase         Ignore case for -p and -e options
-      -l|--limit=NUM          Limit output number of addresses
-                              + Default: 25
-                              + For no limit set to 0
-      -r|--remove=NUM         Uniq IPs after removing NUM of octets from IP
-                              + NUM can be number in range: 1-3
-      -p|--parse=PATTERN      Parse IP only if line contains PATTERN
-                              + usable with -e, exclude has priority
-      -n|--nosort             Do not sort output (performance gain is almost zero)
-                              + Sorting is by occurances of IPs
-      -s|--seek=BYTES[K,M,G]  Skip BYTES when reading input
-                              + No suffix means standard bytes
-                              + [K,M,G] are standard unit suffixes of Byte
-                              + Base is 1024 (NOT 1000)
-      --version               Version of program
-      -v|--verbose            Show what is going on
+      -c --clean            Cleaner output, do not print address counts
+                            + Output is sorted
+                            + Honor --limit settings
+      -e --exclude=PATTERN  Exclude IP if line contains PATTERN 
+                            + usable with -p, exclude has priority
+      -h --help             Show this help
+      -i --ignorecase       Ignore case for -p and -e options
+      -l --limit=NUM        Limit output number of addresses [default: 25]
+                            + For no limit set to 0
+      -r --remove=NUM       Uniq IPs after removing NUM of octets from IP
+                            + NUM can be number in range: 1-3
+      -p --parse=PATTERN    Parse IP only if line contains PATTERN
+                            + usable with -e, exclude has priority
+      -n --nosort           Do not sort output (performance gain is almost zero)
+                            + Sorting is by occurances of IPs
+      -s --seek=BYTES       Skip BYTES when reading input
+                            + [K,M,G] standard unit suffixes can be used
+                            + Unit base is 1024
+      -V --version          Version of program
+      -v --verbose          Show what is going on
 
     EXAMPLES:
-      parseip -c FILE
-      parseip -l=10 FILE.gz
-      cat FILE |parseip
+      cat FILE |parseip -
+      parseip --clean /var/log/syslog
+      parseip --limit 10 FILE.gz
       parseip --parse "123.123.123.1|123.123.123.2" FILE
-      parseip -p"sasl" -e"127.0.0.1|123.123.123|123.123.124" FILE
-      parseip -p="127.0.0.[0-9]+" FILE
-      parseip -s20M /var/log/messages
-      parseip -c -r1 FILE
+      parseip --ignorecase --parse "sasl" --exclude "127.0.0.1|127.0.0.2" /var/log/maillog
+      parseip --parse "127.0.0.[0-9]+" FILE
+      parseip --seek 20M /var/log/messages
+      parseip --clean --remove 1 FILE
     """.dedent()
 
+let args = docopt(doc, version = "2.0.0", optionsFirst = true)
+
 var
-  version     = "1.7.0"
   stdinBool   = true
   counter     = 0
-  ipLimit     = 25
+  ipLimit:      int
   unlimitedBool = false
-  args = initOptParser(shortNoVal = {'c','h','i','v','V', 'n'}, longNoVal = @["clean","help","version","verbose","ignorecase","nosort"])
-  files:        seq[string]
   verboseBool = false
   cleanBool   = false
   ipCount     = initCountTable[string]()
   matches:      seq[string]
-  parse:        string
   parseRe:      Regex
   parseBool   = false
-  exclude:      string
   excludeRe:    Regex
   excludeBool = false
   ignoreCase  = false
-  sortBool    = true
   seekBool    = false
   seekValue:    int
   gzBool      = false
@@ -91,110 +87,84 @@ var
   octetBool   = false
 
 let
-  gzRegex = re(r"\.gz$", {reStudy})
   # ipRegexAccurate = re"(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
   ipRegexSimple = re(r"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}", {reStudy})
 
-for kind, key, val in getopt(args):
-  case kind
-  of cmdEnd: 
-    assert(false)
-  of cmdLongOption, cmdShortOption:
-    case key
-    of "clean", "c":
-      pinf("Clean output, do not print address counts", verboseBool)
-      cleanBool = true
-    of "exclude", "e":
-      exclude = val
-      pinf("Exclude lines containing: " & exclude, verboseBool)
-    of "help", "h": 
-      echo "Version: " & version
-      echo help
-      quit 0
-    of "version", "V": 
-      echo "Version: " & version
-      quit 0
-    of "ignorecase", "i":
-      pinf("Setting case insensivity", verboseBool)
-      ignoreCase = true
-    of "limit", "l":
-      if parseInt(val, ipLimit, 0) == 0:
-        perr("Bad limit, must be number", 3)
-      else:
-        if ipLimit < 0:
-          perr("Lowest number for limit is 0", 2)
-        elif ipLimit == 0:
-          unlimitedBool = true
-        pinf("Setting output limit: " & intToStr(ipLimit), verboseBool)
-    of "remove", "r":
-      if parseInt(val, octetValue, 0) == 0:
-        perr("Bad seek value: Must be number", 3)
-      if octetValue >= 1 and octetValue <= 3:
-        octetBool = true
-        pinf("Remove octets from IP: " & intToStr(octetValue), verboseBool)
-      else:
-        perr("Bad octet value: Not in range 1-3", 3)
-    of "verbose", "v": 
-      verboseBool = true
-      pinf("Verbose output", verboseBool)
-    of "parse", "p":
-      parse = val
-      pinf("Parse only lines containing: " & parse, verboseBool)
-    of "nosort", "n":
-      sortBool = false
-      pinf("Sorting by occurances disabled", verboseBool)
-    of "seek", "s":
-      var seekType: int
+if args["--verbose"]: 
+  verboseBool = true
+  pinf("Verbose output", verboseBool)
+if args["--clean"]:
+  pinf("Clean output, do not print address counts", verboseBool)
+  cleanBool = true
+if args["--ignorecase"]:
+  pinf("Setting case insensivity", verboseBool)
+  ignoreCase = true
+if args["--limit"]:
+  if parseInt($args["--limit"], ipLimit, 0) == 0:
+    perr("Bad limit, must be number", 3)
+  else:
+    if ipLimit < 0:
+      perr("Lowest number for limit is 0", 2)
+    elif ipLimit == 0:
+      unlimitedBool = true
+    pinf("Setting output limit: " & intToStr(ipLimit), verboseBool)
+if args["--remove"]:
+  if parseInt($args["--remove"], octetValue, 0) == 0:
+    perr("Bad seek value: Must be number", 3)
+  if octetValue >= 1 and octetValue <= 3:
+    octetBool = true
+    pinf("Remove octets from IP: " & intToStr(octetValue), verboseBool)
+  else:
+    perr("Bad octet value: Not in range 1-3", 3)
+if args["--seek"]:
+  var seekType: int
+  let valueTmp: string = $args["--seek"]
+  if parseInt(valueTmp, seekValue, 0) == 0:
+    perr("Bad seek value: Must be number", 3)
 
-      if parseInt(val, seekValue, 0) == 0:
-        perr("Bad seek value: Must be number", 3)
+  if seekValue <= 0:
+    perr("Bad seek value: Must be higher than 0", 3)
 
-      if seekValue <= 0:
-        perr("Bad seek value: Must be higher than 0", 3)
+  if   valueTmp.endsWith("K"): seekType = 1024
+  elif valueTmp.endsWith("M"): seekType = 1024 * 1024
+  elif valueTmp.endsWith("G"): seekType = 1024 * 1024 * 1024
+  else:                        seekType = 1
 
-      if   val.endsWith("K"): seekType = 1024
-      elif val.endsWith("M"): seekType = 1024 * 1024
-      elif val.endsWith("G"): seekType = 1024 * 1024 * 1024
-      else:                   seekType = 1
+  seekValue = seekValue * seekType
+  pinf("Skip " & intToStr(seekValue) & " bytes for input stream", verboseBool)
+  seekBool = true
 
-      seekValue = seekValue * seekType
-      pinf("Skip " & intToStr(seekValue) & " bytes for input stream", verboseBool)
-      seekBool = true
-    else:
-      perr("Bad option: " & key, 1)
-  of cmdArgument:
-    # file argument given means no stdin, only options allowed
-    stdinBool = false
-    if fileExists(key):
-      pinf("Search in file: " & key, verboseBool)
-      files.add(key)
-    else:
-      perr("File is missing or not readable: " & key, 1)
+if args["-"]:
+  stdinBool = true
+elif not args["<FILE>"]:
+  perr("Missing input <FILE> or dash '-' to read STDIN", 3)
 
-if not isEmptyOrWhitespace(parse):
+if args["--parse"]:
   parseBool = true
+  pinf("Parse only lines containing: " & $args["--parse"], verboseBool)
   if ignoreCase:
-    parseRe = re(parse, {reStudy, reIgnoreCase})
+    parseRe = re($args["--parse"], {reStudy, reIgnoreCase})
   else:
-    parseRe = re(parse, {reStudy})
+    parseRe = re($args["--parse"], {reStudy})
 
-if not isEmptyOrWhitespace(exclude):
+if args["--exclude"]:
   excludeBool = true
+  pinf("Exclude lines containing: " & $args["--exclude"], verboseBool)
   if ignoreCase:
-    excludeRe = re(exclude, {reStudy, reIgnoreCase})
+    excludeRe = re($args["--exclude"], {reStudy, reIgnoreCase})
   else:
-    excludeRe = re(exclude, {reStudy})
+    excludeRe = re($args["--exclude"], {reStudy})
 
-if stdinBool:
-  files.add("_STDIN_")
-
-for file in files:
+for file in @(args["<FILE>"]):
+  if not stdinBool and not fileExists(file):
+    pwrn("File is missing or not readable: " & file, verboseBool)
+    continue
   let fileIter: Stream = 
-    if contains(file, gzRegex, 0):
+    if file.endsWith(".gz"):
       pinf("Found .gz extension", verboseBool)
       gzBool = true
       newGzFileStream(file)
-    elif stdinBool and file == "_STDIN_":
+    elif stdinBool and file == "-":
       pinf("Reading stdin...", verboseBool)
       newFileStream(stdin)
     else:
@@ -221,7 +191,9 @@ for file in files:
       else:
         ipCount.inc(match)
 
-if sortBool:
+if args["--nosort"]:
+  pinf("Sorting by occurances disabled", verboseBool)
+else:
   ipCount.sort()
 
 if cleanBool:
