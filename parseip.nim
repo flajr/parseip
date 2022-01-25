@@ -40,6 +40,8 @@ let help = """
       -l|--limit=NUM          Limit output number of addresses
                               + Default: 25
                               + For no limit set to 0
+      -r|--remove=NUM         Uniq IPs after removing NUM of octets from IP
+                              + NUM can be number in range: 1-3
       -p|--parse=PATTERN      Parse IP only if line contains PATTERN
                               + usable with -e, exclude has priority
       -n|--nosort             Do not sort output (performance gain is almost zero)
@@ -62,13 +64,14 @@ let help = """
     """.dedent()
 
 var
-  version     = "1.6.1"
+  version     = "1.7.0"
   stdinBool   = true
   counter     = 0
   ipLimit     = 25
+  unlimitedBool = false
   args = initOptParser(shortNoVal = {'c','h','i','v','V', 'n'}, longNoVal = @["clean","help","version","verbose","ignorecase","nosort"])
   files:        seq[string]
-  verboseBool     = false
+  verboseBool = false
   cleanBool   = false
   ipCount     = initCountTable[string]()
   matches:      seq[string]
@@ -83,9 +86,11 @@ var
   seekBool    = false
   seekValue:    int
   gzBool      = false
+  octetValue:   int
+  octetBool   = false
 
 let
-  gzRegex = re(r"\.gz$")
+  gzRegex = re(r"\.gz$", {reStudy})
   # ipRegexAccurate = re"(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
   ipRegexSimple = re(r"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}", {reStudy})
 
@@ -117,7 +122,17 @@ for kind, key, val in getopt(args):
       else:
         if ipLimit < 0:
           perr("Lowest number for limit is 0", 2)
+        elif ipLimit == 0:
+          unlimitedBool = true
         pinf("Setting output limit: " & intToStr(ipLimit), verboseBool)
+    of "remove", "r":
+      if parseInt(val, octetValue, 0) == 0:
+        perr("Bad seek value: Must be number", 3)
+      if octetValue >= 1 and octetValue <= 3:
+        octetBool = true
+        pinf("Remove octets from IP: " & intToStr(octetValue), verboseBool)
+      else:
+        perr("Bad octet value: Not in range 1-3", 3)
     of "verbose", "v": 
       verboseBool = true
       pinf("Verbose output", verboseBool)
@@ -192,20 +207,33 @@ for file in files:
     if parseBool and not contains(line, parseRe, 0): continue
     matches = findAll(line, ipRegexSimple, 0)
     for match in matches:
-      ipCount.inc(match)
+      if octetBool:
+        case octetValue
+        of 1:
+          ipCount.inc(match.rsplit({'.'}, maxsplit = 1)[0] & ".0")
+        of 2:
+          ipCount.inc(match.rsplit({'.'}, maxsplit = 2)[0] & ".0.0")
+        of 3:
+          ipCount.inc(match.rsplit({'.'}, maxsplit = 3)[0] & ".0.0.0")
+        else:
+          perr("Unexpected octetValue", 5)
+      else:
+        ipCount.inc(match)
 
 if sortBool:
   ipCount.sort()
 
 if cleanBool:
   for k in keys(ipCount):
-    if counter == ipLimit: 
-      break
+    # check counter against ipLimit and honor unlimited if ipLimit=0
+    if counter == ipLimit:
+      if not unlimitedBool: break
     echo k  
     inc counter
 else:
   for k, v in pairs(ipCount):
-    if counter == ipLimit: 
-      break
+    # check counter against ipLimit and honor unlimited if ipLimit=0
+    if counter == ipLimit:
+      if not unlimitedBool: break
     echo v, "\t", k
     inc counter
