@@ -61,6 +61,7 @@ let help = """
       parseip -p"sasl" -e"127.0.0.1|123.123.123|123.123.124" FILE
       parseip -p="127.0.0.[0-9]+" FILE
       parseip -s20M /var/log/messages
+      parseip -c -r1 FILE
     """.dedent()
 
 var

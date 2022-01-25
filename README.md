@@ -2,7 +2,7 @@
 
 Simple IPv4 parser written in Nim with gzip files handling and build compatibility for musl
 
-## Help `parseip -h`
+## `parseip -h`
 
 ```
     parseip [OPTIONS] [FILE[ FILE]]
@@ -34,6 +34,8 @@ Simple IPv4 parser written in Nim with gzip files handling and build compatibili
       -l|--limit=NUM          Limit output number of addresses
                               + Default: 25
                               + For no limit set to 0
+      -r|--remove=NUM         Uniq IPs after removing NUM of octets from IP
+                              + NUM can be number in range: 1-3
       -p|--parse=PATTERN      Parse IP only if line contains PATTERN
                               + usable with -e, exclude has priority
       -n|--nosort             Do not sort output (performance gain is almost zero)
@@ -44,18 +46,16 @@ Simple IPv4 parser written in Nim with gzip files handling and build compatibili
                               + Base is 1024 (NOT 1000)
       --version               Version of program
       -v|--verbose            Show what is going on
-```
 
-### Examples
-
-```
-parseip -c FILE
-parseip -l=10 FILE.gz
-cat FILE |parseip
-parseip --parse "123.123.123.1|123.123.123.2" FILE
-parseip -p"sasl" -e"127.0.0.1|123.123.123|123.123.124" FILE
-parseip -p="127.0.0.[0-9]+" FILE
-parseip -s20M /var/log/messages
+    EXAMPLES:
+      parseip -c FILE
+      parseip -l=10 FILE.gz
+      cat FILE |parseip
+      parseip --parse "123.123.123.1|123.123.123.2" FILE
+      parseip -p"sasl" -e"127.0.0.1|123.123.123|123.123.124" FILE
+      parseip -p="127.0.0.[0-9]+" FILE
+      parseip -s20M /var/log/messages
+      parseip -c -r1 FILE
 ```
 
 ### Build
