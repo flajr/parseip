@@ -6,7 +6,10 @@ host := `uname -a`
 # used for building pcre...
 export CC := "musl-gcc -static"
 
-main_file   := "parseip.nim"
+project     := "parseip"
+main_file   := project + ".nim"
+main_exec   := project
+musl_exec   := project + "_x86_64-unknown-linux-musl"
 
 pcre_ver    := "8.45"
 pcre_name   := "pcre-" + pcre_ver
@@ -71,3 +74,9 @@ zlib: zlib_get
     cd {{zlib_name}} && ./configure \
     --prefix="{{zlib_dir}}"
     cd {{zlib_name}} && make -j8 && make install
+
+shasum:
+    sha256sum {{main_exec}} >{{main_exec}}.sha256
+
+release tag:
+    gh release create {{tag}}
