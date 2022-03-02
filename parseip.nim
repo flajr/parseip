@@ -64,10 +64,10 @@ let doc = """
       parseip --clean --remove 1 FILE
     """.dedent()
 
-let args = docopt(doc, version = "2.0.0", optionsFirst = true)
+let args = docopt(doc, version = "2.0.1", optionsFirst = true)
 
 var
-  stdinBool   = true
+  stdinBool   = false
   counter     = 0
   ipLimit:      int
   unlimitedBool = false
@@ -156,7 +156,7 @@ if args["--exclude"]:
     excludeRe = re($args["--exclude"], {reStudy})
 
 for file in @(args["<FILE>"]):
-  if not stdinBool and not fileExists(file):
+  if stdinBool == false and fileExists(file) == false:
     pwrn("File is missing or not readable: " & file, verboseBool)
     continue
   let fileIter: Stream = 
