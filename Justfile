@@ -32,19 +32,7 @@ alias b := build
 # --mm:markAndSweep \
 # --mm:arc \
 build:
-    nim --gcc.exe:musl-gcc \
-    --gcc.linkerexe:musl-gcc \
-    --mm:orc \
-    -d:release \
-    --opt:speed \
-    --passL:-static \
-    --passC:"-Ipcre/include" \
-    --passL:"pcre/lib/libpcre.a" \
-    --passC:"-Izlib/include" \
-    --passL:"zlib/lib/libz.a" \
-    -d:usePcreHeader \
-    --dynlibOverrideAll \
-    compile {{main_file}}
+	nim compile {{project}}
 
 # run a specific test
 # test TEST: build

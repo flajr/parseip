@@ -1,0 +1,12 @@
+--gcc.exe:"musl-gcc"
+--gcc.linkerexe:"musl-gcc"
+--define:release
+--opt:size
+--passL:"-static"
+--passC:"-Ipcre/include"
+--passL:"pcre/lib/libpcre.a"
+--passC:"-Izlib/include"
+--passL:"zlib/lib/libz.a"
+--define:usePcreHeader
+--dynlibOverrideAll
+--threads:off
